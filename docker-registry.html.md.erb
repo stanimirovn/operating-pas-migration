@@ -30,8 +30,7 @@ If you provide your root CA certificate in the <%= vars.ops_manager %> configura
 1. Click **Save**.
 
 1. Choose one of the following:
-  - If you are configuring <%= vars.ops_manager %> for the first time, return to your specific IaaS installation instructions ([AWS](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/aws.html), [Azure](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/azure.html), [GCP](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/gcp.html), [OpenStack](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/openstack.html), [vSphere](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/vsphere.html)) to continue the installation process.
-  - If you are modifying an existing <%= vars.ops_manager %> installation, return to the <%= vars.ops_manager %> Installation Dashboard, click **Review Pending Changes**, and click **Apply Changes**.
+
 
 After configuration, BOSH propagates your CA certificate to all application containers in your deployment. You can then push and pull images from your Docker registries.
 
