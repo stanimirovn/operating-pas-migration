@@ -1,0 +1,214 @@
+---
+title: Configuring File Storage for TAS for VMs
+owner: Releng
+---
+
+This topic provides instructions for configuring file storage for <%= vars.app_runtime_full %>
+(<%= vars.app_runtime_abbr %>) based on your IaaS and installation method. See the section that
+applies to your use case.
+
+To minimize system downtime, <%= vars.company_name %> recommends using highly resilient and
+redundant _external_ filestores for your <%= vars.app_runtime_abbr %> file storage. For more
+factors to consider when selecting file storage, see [Configure File Storage]
+(configuring.html#file-storage) in _Configuring <%= vars.app_runtime_abbr %> for Upgrades_.
+
+<p class="note">
+    <strong>Note:</strong> After initial installation, do not change file storage
+      configuration without first migrating existing files to the new provider.
+</p>
+
+
+## <a id="internal"></a> Internal File Storage
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_internal" %>
+
+
+## <a id="aws"></a> AWS
+
+This section describes how to configure file storage for AWS.
+
+<p class="note"><strong>Note:</strong> If you followed the procedure in
+  <a href="https://docs.pivotal.io/ops-manager/<%= vars.current_major_version.sub('.','-') %>/aws/prepare-env-manual.html"> Preparing to Deploy <%= vars.ops_manager %> on AWS</a>, you created the necessary
+  resources for external S3-compatible file storage.</p>
+
+For production-level <%= vars.platform_name %> deployments on AWS, <%= vars.company_name %>
+recommends selecting **External S3-compatible filestore**.
+For instructions, see [External S3-Compatible Filestore](#aws-s3) below.
+
+You can also configure Fog blobstores to use AWS IAM instance profiles.
+For instructions, see [Fog with AWS IAM Instance Profiles](#fog-aws-iam) below.
+
+For more information about production-level
+<%= vars.platform_name %> deployments on AWS, see [AWS Reference Architecture]
+(https://docs.pivotal.io/ops-manager/2-10/refarch/aws/aws_ref_arch.html).
+
+### <a id="aws-s3"></a>External S3-Compatible Filestore
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial(:"/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_s3_config", :locals => { :aws => true }) %>
+
+### <a id="fog-aws-iam"></a> Fog with AWS IAM Instance Profiles
+
+To configure Fog blobstores to use AWS IAM instance profiles:
+
+1. Configure an additional <code>cloud-controller</code> IAM role with the following policy to give access to the S3 buckets you plan to use:
+
+    ```
+    {
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Action": [ "s3:*" ],
+        "Resource": [
+          "arn:aws:s3:::YOUR-AWS-BUILDPACK-BUCKET",
+          "arn:aws:s3:::YOUR-AWS-BUILDPACK-BUCKET/*",
+          "arn:aws:s3:::YOUR-AWS-DROPLET-BUCKET",
+          "arn:aws:s3:::YOUR-AWS-DROPLET-BUCKET/*",
+          "arn:aws:s3:::YOUR-AWS-PACKAGE-BUCKET",
+          "arn:aws:s3:::YOUR-AWS-PACKAGE-BUCKET/*",
+          "arn:aws:s3:::YOUR-AWS-RESOURCE-BUCKET",
+          "arn:aws:s3:::YOUR-AWS-RESOURCE-BUCKET/*",
+        ]
+      }]
+    }
+    ```
+
+    Replace `YOUR-AWS-BUILDPACK-BUCKET`, `YOUR-AWS-DROPLET-BUCKET`, `YOUR-AWS-PACKAGE-BUCKET`, and `YOUR-AWS-RESOURCE-BUCKET` with the names of your AWS buckets. Do not use periods (`.`) in your AWS bucket names.
+
+    If you use the AWS console, an IAM role is automatically assigned to an IAM instance profile with the same name, `cloud-controller`. If you do not use the AWS console, you must create an IAM instance profile with a single assigned IAM role. For more information, see [Step 4: Create an IAM Instance Profile for Your Amazon EC2 Instances](https://docs.aws.amazon.com/codedeploy/latest/userguide/getting-started-create-iam-instance-profile.html) in the AWS documentation.
+
+1. In your [BOSH cloud config](https://bosh.io/docs/cloud-config/), create a [VM extension](https://bosh.io/docs/cloud-config/#vm-extensions) to add the IAM instance profile you created to VMs using the extension.
+
+    ```
+    vm_extensions:
+    - cloud_properties:
+        iam_instance_profile: cloud-controller
+      name: cloud-controller-iam
+    ```
+
+    <p class="note"><strong>Note</strong>: You can also create a VM extension using the Ops Manager API. For more information, see <a href="https://docs.pivotal.io/ops-manager/<%= vars.current_major_version.sub('.','-') %>/install/custom-vm-extensions.html#create-vm-extension">Create or Update a VM Extension</a> in <em>Managing Custom VM Extensions</em>.</p>
+
+1. In your <%= vars.app_runtime_abbr %> deployment manifest, use the `cloud-controller-iam` VM extension you created for the instance groups containing `cloud_controller`, `cloud_controller_worker`, and `cloud_controller_clock`, as in the example below:
+
+    ```
+    instance_groups:
+    ...
+    - name: api
+      ...
+      vm_extensions:
+      - cloud-controller-iam
+    ...
+    - name: cc-worker
+      ...
+      vm_extensions:
+      - cloud-controller-iam
+    ...
+    - name: scheduler
+      ...
+      vm_extensions:
+      - cloud-controller-iam
+    ```
+
+1. Insert the following configuration into your deployment manifest under `properties.cc`:
+
+    ```
+    cc:
+      buildpacks:
+        blobstore_type: fog
+        buildpack_directory_key: YOUR-AWS-BUILDPACK-BUCKET
+        fog_connection: &fog_connection
+          provider: AWS
+          region: us-east-1
+          use_iam_profile: true
+      droplets:
+        blobstore_type: fog
+        droplet_directory_key: YOUR-AWS-DROPLET-BUCKET
+        fog_connection: *fog_connection
+      packages:
+        blobstore_type: fog
+        app_package_directory_key: YOUR-AWS-PACKAGE-BUCKET
+        fog_connection: *fog_connection
+      resource_pool:
+        blobstore_type: fog
+        resource_directory_key: YOUR-AWS-RESOURCE-BUCKET
+        fog_connection: *fog_connection
+    ```
+
+    Replace `YOUR-AWS-BUILDPACK-BUCKET`, `YOUR-AWS-DROPLET-BUCKET`, `YOUR-AWS-PACKAGE-BUCKET`, and `YOUR-AWS-RESOURCE-BUCKET` with the names of your AWS buckets. Do not use periods (`.`) in your AWS bucket names.
+
+1. (Optional) Provide other configuration with the `fog_connection` hash, which is passed through to the Fog gem.
+
+
+## <a id="gcp"></a> GCP
+
+This section describes how to configure file storage for GCP. Follow the procedure that
+corresponds to your installation method:
+
+* [Manual](#gcp-manual)
+* [Terraform](#gcp-terraform)
+
+For production-level <%= vars.platform_name %> deployments on GCP, <%= vars.company_name %>
+recommends selecting **External Google Cloud Storage**. For more information about production-level
+<%= vars.platform_name %> deployments on GCP, see [GCP Reference Architecture]
+(https://docs.pivotal.io/ops-manager/2-10/refarch/gcp/gcp_ref_arch.html).
+
+### <a id="gcp-manual"></a> Manual
+
+This section describes how to configure file storage for GCP if you installed <%= vars.platform_name %>
+manually.
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_gcp_config" %>
+
+### <a id="gcp-terraform"></a> Terraform
+
+This section describes how to configure file storage for GCP if you installed <%= vars.platform_name %>
+with Terraform.
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_gcp_config_terraform" %>
+
+
+## <a id="azure"></a> Azure
+
+This section describes how to configure file storage for Azure.
+
+For production-level <%= vars.platform_name %> deployments on Azure, <%= vars.company_name %>
+recommends selecting **External Azure Storage**. For more information about production-level
+<%= vars.platform_name %> deployments on Azure, see [Azure Reference Architecture]
+(https://docs.pivotal.io/ops-manager/2-10/refarch/azure/azure_ref_arch.html).
+
+For more factors to consider when selecting file storage, see [Configure File Storage]
+(configuring.html#file-storage) in _Configuring <%= vars.app_runtime_abbr %> for Upgrades_.
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_azure_config" %>
+
+
+## <a id="openstack"></a> OpenStack
+
+For production-level <%= vars.platform_name %> deployments on OpenStack, <%= vars.company_name %>
+recommends selecting **External S3-compatible filestore**. For more information about production-level
+<%= vars.platform_name %> deployments on OpenStack, see [OpenStack Reference Architecture]
+(https://docs.pivotal.io/ops-manager/2-10/refarch/openstack/openstack_ref_arch.html).
+
+For more factors to consider when selecting file storage, see [Configure File Storage]
+(configuring.html#file-storage) in _Configuring <%= vars.app_runtime_abbr %> for Upgrades_.
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial(:"/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_s3_config", :locals => { :aws => false }) %>
+
+
+## <a id="vsphere"></a> vSphere
+
+For production-level <%= vars.platform_name %> deployments on vSphere, <%= vars.company_name %>
+recommends selecting **External S3-compatible filestore** and using an external filestore.
+For more information about production-level <%= vars.platform_name %> deployments on vSphere,
+see [vSphere Reference Architecture](https://docs.pivotal.io/ops-manager/2-10/refarch/vsphere/vsphere_ref_arch.html).
+
+For more factors to consider when selecting file storage, see [Configure File Storage]
+(configuring.html#file-storage) in _Configuring <%= vars.app_runtime_abbr %> for Upgrades_.
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial(:"/pcf/core/#{vars.current_major_version.sub('.', '-')}/filestore_s3_config", :locals => { :aws => false }) %>

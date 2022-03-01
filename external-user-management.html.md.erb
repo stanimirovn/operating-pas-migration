@@ -1,0 +1,115 @@
+---
+title: Adding Existing SAML or LDAP Users to a TAS for VMs Deployment
+owner: Identity
+---
+
+<% current_page.data.title = "Adding Existing SAML or LDAP Users to a " + vars.app_runtime_abbr + " Deployment" %>
+
+This topic describes the procedure for adding existing SAML or LDAP users to a <%= vars.app_runtime_full %> (<%= vars.app_runtime_abbr %>) deployment enabled with SAML or LDAP.
+
+The following two ways exist to add existing SAML or LDAP users to your <%= vars.app_runtime_abbr %> deployment:
+
+* [Option 1: Import Users in Bulk](#bulk-import)
+* [Option 2: Add Users Manually](#manual)
+
+
+## <a id='prereqs'></a> Prerequisites
+
+To perform the procedures in this topic, you must have:
+
+* Admin access to the <%= vars.ops_manager %> Installation Dashboard for your <%= vars.app_runtime_abbr %> deployment
+
+* The [Cloud Foundry Command Line Interface](../cf-cli/install-go-cli.html) (cf CLI) v6.23.0 or later
+
+
+## <a id='bulk-import'></a> Option 1: Import Users in Bulk
+
+You can import SAML or LDAP users in bulk by using the CF-MGMT Tool. For instructions about installing and using the tool, see [the CF-MGMT README](https://github.com/pivotalservices/cf-mgmt).
+
+
+## <a id='manual'></a> Option 2: Add Users Manually
+
+The following sections describe how to add existing SAML or LDAP users to your <%= vars.app_runtime_abbr %> deployment manually.
+
+### <a id='step-id'></a> Step 1: Create User
+
+To add a SAML or LDAP user:
+
+1. Target the API endpoint for your <%= vars.app_runtime_abbr %> deployment by running:
+
+    ```
+    cf target https://api.SYSTEM-DOMAIN
+    ```
+    Where `SYSTEM-DOMAIN` is your system domain.
+
+1. Run:
+
+    ```
+    cf login
+    ```
+
+1. Provide credentials for an account with the Admin user role. For more information about the Admin user role, see [Roles and Permissions](../concepts/roles.html#roles) in _Orgs, Spaces, Roles, and Permissions_.
+
+1. Create the user in UAA by running:
+
+    ```
+    cf create-user USERNAME --origin PROVIDER-NAME
+    ```
+    Where:
+    * `USERNAME` is the username of the SAML or LDAP user you want to add.
+    * `PROVIDER-NAME` is `ldap` for an LDAP user, or the name of the SAML provider you provided when configuring <%= vars.ops_manager %> for a SAML user.
+
+### <a id='user-role'></a> Step 2: Associate User with Org or Space Role
+
+After creating the SAML or LDAP user, you must associate the user with either an Org or Space role.
+
+For more information about roles, see [Roles and Permissions](../concepts/roles.html#roles) in _Orgs, Spaces, Roles, and Permissions_.
+
+#### <a id='org-role'></a> Associate User with Org Role
+
+To associate the SAML or LDAP user with an Org role:
+
+1. Run:
+
+    ```
+    cf set-org-role USERNAME ORG ROLE
+    ```
+    Where:
+    * `USERNAME` is the name of the SAML or LDAP user.
+    * `ORG` is the name of your org.
+    * For `ROLE`, enter one of the following:
+      * `OrgManager`: Org Managers can invite and manage users, select and change plans, and set spending limits.
+      * `BillingManager`: Billing Managers can create and manage the billing account and payment information.
+      * `OrgAuditor`: Org Auditors have read-only access to Org information and reports.
+      <br>
+      <br>
+    For example:
+
+      ```
+      cf set-org-role j.smith@example.com example-org OrgManager
+      ```
+
+#### <a id='space-role'></a> Associate User with Space Role
+
+To associate the SAML or LDAP user with a Space role:
+
+1. Run:
+
+    ```
+    cf set-space-role USERNAME ORG SPACE ROLE
+    ```
+    Where:
+    * `USERNAME` is the name of the SAML or LDAP user.
+    * `ORG` is the name of your org.
+    * `SPACE` is the name of a space in your org.
+    * For `ROLE`, enter one of the following:
+      * `SpaceManager`: Space Managers can invite and manage users, and enable features for a given Space.
+      * `SpaceDeveloper`: Space Developers can create and manage apps and services, and see logs and reports.
+      * `SpaceAuditor`: Space Auditors can view logs, reports, and settings on this Space.
+      <br>
+      <br>
+    For example:
+
+      ```
+      cf set-space-role j.smith@example.com example-org example-space SpaceDeveloper
+      ```

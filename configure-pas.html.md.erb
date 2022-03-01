@@ -1,0 +1,320 @@
+---
+title: Configuring TAS for VMs
+owner: PAS Releng
+---
+
+This topic describes how to configure <%= vars.app_runtime_first %> as part of deploying <%= vars.platform_name %>.
+
+
+## <a id='prereqs'></a> Prerequisites
+
+Before beginning this procedure, you must:
+
+* Ensure that you have successfully completed the steps to prepare your environment for <%= vars.platform_name %> and install and configure the BOSH Director. For more information, see the [<%= vars.ops_manager_full %> configuration topic for your IaaS](https://docs.pivotal.io/platform/ops-manager/<%= vars.current_major_version.sub('.', '-') %>/index.html).
+
+* If you plan to install the <%= vars.platform_name %> IPsec add-on, you must do so before installing any other tiles. <%= vars.company_name %> recommends installing IPsec immediately after <%= vars.ops_manager %> and before installing the <%= vars.app_runtime_abbr %> Runtime tile. For more information, see [Installing the IPsec Add-On for <%= vars.platform_name %>](http://docs.pivotal.io/addon-ipsec/installing.html).
+
+
+## <a id='om-add'></a> Add <%= vars.app_runtime_abbr %> to <%= vars.ops_manager %>
+
+Before you can configure <%= vars.app_runtime_abbr %>, you must add the <%= vars.app_runtime_abbr %> tile to your <%= vars.ops_manager %> Installation Dashboard.
+
+To add the <%= vars.app_runtime_abbr %> tile to your <%= vars.ops_manager %> Installation Dashboard:
+
+1. If you have not already downloaded <%= vars.app_runtime_abbr %>, log in to [<%= vars.product_network %>](https://network.pivotal.io/products/pivotal-cf) and click **<%= vars.app_runtime_full %>**.
+
+1. From the **Releases** dropdown, select the release to install and choose one of the following:
+  1. Click **<%= vars.app_runtime_full %>** to download the Pivotal Application Service `.pivotal` file.
+  1. Click **Small Footprint <%= vars.app_runtime_abbr %>** to download the Small Footprint PAS `.pivotal` file. For more information, see [Getting Started with Small Footprint <%= vars.app_runtime_abbr %>](./small-footprint.html).
+
+1. Navigate to the <%= vars.ops_manager %> Installation Dashboard.
+
+1. Click **Import a Product** to add your tile to <%= vars.ops_manager %>. For more information, see [Adding and Deleting Products](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/add-delete.html).
+
+1. Click the **<%= vars.app_runtime_full %>** tile in the Installation Dashboard.
+
+
+## <a id='assign-azs-networks'></a> Assign AZs and Networks
+
+<p class="note"><strong>Note:</strong> For Azure environments, this configuration pane is <strong>Assign Networks</strong> and does not include AZ configuration.</p>
+
+In the **Assign AZ and Networks** pane, you assign jobs to your Availability Zones (AZs) and networks.
+
+To configure the **Assign AZ and Networks** pane:
+
+1. Select **Assign AZ and Networks**.
+
+1. Select the first AZ under **Place singleton jobs**. <%= vars.ops_manager %> runs any job with a single instance in this AZ.
+
+1. Select all AZs under **Balance other jobs**. <%= vars.ops_manager %> balances instances of jobs with more than one instance across the AZs that you specify.
+    <p class="note"><strong>Note:</strong> For production deployments, <%= vars.company_name %> recommends at least three AZs for a highly available installation.</p>
+
+1. From the **Network** dropdown, choose the runtime network that you created when configuring the BOSH Director tile.
+
+1. Click **Save**.
+
+
+## <a id='domains'></a> Configure Domains
+
+In the **Domains** pane, you configure a wildcard DNS record for both the apps domain and system domain.
+
+To configure the **Domains** pane:
+
+1. Select **Domains**.
+
+1. Enter the name of your system domain in the **System domain** field. The system domain defines your target when you push apps to <%= vars.app_runtime_abbr %>, such as your load balancer or HAProxy. <%= vars.app_runtime_abbr %> assigns system components such as UAA and Apps Manager to subdomains under this domain.
+
+1. Enter the name of your apps domain in the **Apps domain** field. The apps domain is the default domain that apps use for their hostnames. <%= vars.app_runtime_abbr %> hosts each app at subdomains under this domain. You can use the Cloud Foundry Command Line Interface (cf CLI) to add or delete subdomains assigned to individual apps.
+
+1. Click **Save**.
+
+For additional guidance based on your installation method, see the following table:
+	<table>
+		<tr>
+			<th>Installation Method</th>
+			<th>Guidance</th>
+		</tr>
+		<tr>
+			<td>Manual</td>
+			<td>Enter the domains you created when preparing your environment for <%= vars.platform_name %>.</td>
+		</tr>
+		<tr>
+			<td>Terraform</td>
+			<td>Enter the values for <code>sys\_domain</code> and <code>apps\_domain</code> from the Terraform output.</td>
+		</tr>
+	</table>
+	<p class="note"><strong>Note:</strong> <%= vars.company_name %> recommends that you use the same domain name but different subdomain names for your system and app domains. Doing so allows you to use a single wildcard certificate for the domain while preventing apps from creating routes that overlap with system routes.</p>
+
+
+## <a id='networking'></a> Configure Networking
+
+<div><%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/networking-main" %></div>
+
+## <a id='application-containers-config'></a> Configure App Containers
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/application_container_config" %>
+
+## <a id='appdevctrl-config'></a> Configure App Developer Controls
+
+In the **App Developer Controls** pane, you configure restrictions and default settings for your apps.
+
+To configure the **App Developer Controls** pane:
+
+1. Select **App Developer Controls**.
+
+1. Enter the **Maximum file upload size** in MB. This is the maximum size of an app upload, including the buildpack.
+
+1. Enter the **Maximum package size** in MB. This is the maximum total size of an app's files.
+
+1. Enter the **Default app memory** in MB. This is the default amount of memory allocated to a newly-pushed app if no value is specified with `cf push`.
+
+1. Enter the **Default app memory quota per org** in MB. This is the default memory limit for all apps in an org. The specified limit only applies to the first installation of <%= vars.app_runtime_abbr %>. After the initial installation, operators can use the cf CLI to change the default value.
+
+1. Enter the **Maximum disk quota per app** in MB. This is the maximum amount of disk allowed per app.
+	<p class="note"><strong>Note:</strong> If you allow developers to push large apps, <%= vars.app_runtime_abbr %> may have trouble placing them on Diego Cells. Additionally, in the event of a system upgrade or an outage that causes a rolling deploy, larger apps may not successfully re-deploy if there is insufficient disk capacity. Monitor your deployment to ensure your Diego Cells have sufficient disk to run your apps.</p>
+
+1. Enter the **Default disk quota per app** in MB. This is the amount of disk allocated by default to a newly-pushed app if no value is specified with `cf push`.
+
+1. Enter the **Default service instance quota per org**. The specified limit only applies to the first installation of <%= vars.app_runtime_abbr %>. After the initial installation, operators can use the cf CLI to change the default value.
+
+1. Enter the **Staging timeout** in seconds. When you stage an app droplet with the Cloud Controller, the server times out after the number of seconds you specify in this field.
+
+1. For **Internal domains**, enter one or more domains that apps use for internal DNS service discovery. If you specify a domain using `cf push -d`, other <%= vars.app_runtime_abbr %> apps can reach the pushed app at `APP-NAME.INTERNAL-DOMAIN`. This value defaults to `apps.internal`.
+
+1. Enable the **Allow space developers to manage network policies** checkbox to permit developers to manage their own network policies for their apps.
+
+1. Click **Save**.
+
+## <a id='app-security'></a> Configure App Security Groups
+
+Setting appropriate ASGs is critical for a secure deployment. To acknowledge that you are responsible for setting the
+appropriate ASGs after the <%= vars.app_runtime_abbr %> deployment completes:
+
+1. Select **App Security Groups**.
+1. In the **Type "X" to acknowledge this requirement** field, enter `X`.
+1. Click **Save**.
+
+For more information about ASGs, see [App Security Groups](../concepts/asg.html). For more information about setting
+ASGs, see [Restricting App Access to Internal <%= vars.app_runtime_abbr %> Components](../opsguide/app-sec-groups.html).
+
+## <a id='auth-config'></a> Configure Authentication and Enterprise SSO
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/authsso_config" %>
+
+## <a id='uaa'></a> Configure UAA
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/uaa" %>
+
+## <a id='credhub'></a> Configure CredHub
+
+In the **CredHub** pane, you configure the CredHub server.
+
+To configure the **CredHub** pane:
+
+1. Select **CredHub**.
+
+1. Under **CredHub database location**, select the location of your CredHub database. <%= vars.app_runtime_abbr %> includes this CredHub database for services to store their service instance credentials.
+    * **Tanzu Application Service database**: If you select this option, CredHub uses the same database as other <%= vars.app_runtime_abbr %> components, whether the database is internal or external. You configure this database in the **Databases** pane.
+    * **Other external database**: If you select this option, configure these fields:
+        * **Hostname:** Enter the IP address of your database server.
+        * **TCP port:** Enter the port of your database server, such as `3306`.
+        * **Username:** Enter a unique username that can access your CredHub database on the database server.
+        * **Password:** Enter the password for the provided username.
+        * **Database CA certificate:** This certificate is used when encrypting traffic to and from the database.
+        * **Disable hostname verification:** Enable this checkbox to disable hostname verification for TLS connections to the targeted database server. You cannot disable hostname verification for TLS connections to Postgres databases. You must select this option if you are configuring an external database on GCP or Azure.
+      <div class="note"><strong>Note:</strong> If you deploy <%= vars.app_runtime_abbr %> on AWS using Terraform, you can locate these values in your Terraform output:
+          <ul>
+            <li><strong>Hostname:</strong> <code>rds\_address</code></li>
+            <li><strong>TCP port:</strong> <code>rds\_port</code></li>
+            <li><strong>Username:</strong> <code>rds\_username</code></li>
+            <li><strong>Password:</strong> <code>rds\_password</code></li>
+          </ul>
+      </div>
+
+1. (Optional) Under **KMS plugin providers**, specify one or more Key Management Service (KMS) providers:
+    * **Instance name:** Enter the name of the KMS provider.
+    * **Endpoint:** Enter the Unix socket address for the KMS plugin.
+    * **Primary:** Enable the **Primary** checkbox to indicate the primary KMS provider for your environment. You must mark one provider as primary. Do not mark more than one provider as primary.
+
+1. Under **Internal encryption provider keys**, specify one or more keys to use for encrypting and decrypting the values stored in the CredHub database.
+    * If you plan to use internal encryption, configure these fields:
+        * **Name:** Enter any key name.
+        * **Key:** Enter a randomly generated value that is at least 20 characters long. This key is used for encrypting all data.
+        * **Primary:** This checkbox marks the key you specified above as the primary encryption key. You must mark one key as primary. Do not mark more than one key as primary.
+    * If you plan to use a hardware security module (HSM) as your encryption provider, configure these fields:
+        * **Name:** Enter a key name that already exists on your HSM or a new key name. For each new key name, CredHub generates a key in **HSM provider partition** that you configure below.
+        * **Key:** Enter a placeholder value under **Key**. CredHub does not use this key for encryption. However, you cannot leave the **Key** field blank.
+        * **Primary:** This checkbox is used for marking the key you specified above as the primary encryption key. You must mark one key as primary. Do not mark more than one key as primary.
+    <p class="note"><strong>Note:</strong> For information about using additional keys for key rotation, see <a href="../opsguide/credential-rotation.html">Rotating Runtime CredHub Encryption Keys</a>.</p>
+
+1. (Optional) To configure CredHub to use an HSM, configure these fields:
+    * **HSM provider partition:** Enter the name of the HSM provider partition.
+    * **HSM provider partition password:** Enter a password to use to access the HSM provider partition.
+    * **HSM provider client certificate:** Enter the client certificate for the HSM. For more information, see [Create and Register HSM Clients](https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/hsm-config.html#create-register-hsm) in _Preparing CredHub HSMs for Configuration_.
+    * Under **HSM provider encryption keys**, specify one or more keys to use for encrypting and decrypting the values stored in the HSM provider. For each key, configure these fields:
+        * **Name:** Enter the name of the encryption key.
+        * **Primary:** This checkbox is used for marking the key you specified above as the primary encryption key. You must mark one key as primary. Do not mark more than one key as primary.
+    * In the **HSM provider servers** section, click **Add** to add an HSM server. You can add multiple HSM servers. For each HSM server, configure these fields:
+        * **Host address:** Enter the hostname or IP address of the HSM server.
+        * **Port:** Enter the port of the HSM server. If you do not know your port address, enter `1792`.
+        * **Partition serial number:** Enter the serial number of the HSM partition.
+        * **HSM certificate:** Enter the certificate for the HSM server. The HSM presents this certificate to CredHub to establish a two-way TLS connection.
+
+1. If your deployment uses any <%= vars.platform_name %> services that support storing service instance credentials in CredHub and you want to enable this feature, enable the **Secure service instance credentials** checkbox. For more information about using CredHub for securing service instance credentials, see [Securing Service Instance Credentials with Runtime CredHub](../opsguide/secure-si-creds.html).
+
+1. Click **Save**.
+
+1. Go to the **Resource Config** pane.
+
+1. Under the **Job** column of the **CredHub** row, ensure that the number of instances is set to `2`. This is the minimum instance count required for high availability.
+
+1. To configure UAA so it recognizes a proxy, complete the following fields:
+    * **List of proxy servers:** Enter a comma-separated list of router IP addresses for the first group of HTTP/TCP backends. 
+    * **http proxy:** Enter the `http_proxy` for all http requests across VMs.
+    * **https proxy:** Enter the `https_proxy` for all http requests across VMs
+    * **no proxy:** Enter a comma-separated list of either domains, IP addresses or DNS suffixes. 
+
+1. Click **Save**. 
+
+## <a id='sys-db'></a> Configure Databases
+
+In the **Databases** pane, you can configure <%= vars.app_runtime_abbr %> to use an internal MySQL database provided with <%= vars.platform_name %>, or you can configure an external database provider for the databases required by <%= vars.app_runtime_abbr %>.
+
+<p class="note"><strong>Note:</strong> If you are performing an upgrade, do not modify your existing internal database configuration, or you may lose data. You must migrate your existing data first before changing the configuration. For additional upgrade information, see <a href="https://docs.pivotal.io/platform/<%= vars.current_major_version.sub('.', '-') %>/customizing/upgrading-pcf.html">Upgrading <%= vars.platform_name %></a>.</p>
+
+### <a id='internal-db'></a> Internal Database Configuration
+
+<p class="note"><strong>Note:</strong> For GCP installations, <%= vars.company_name %> recommends selecting <strong>External</strong> and using Google Cloud SQL. Only use internal MySQL for non-production or test installations on GCP.</p>
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/ert_database_internal" %>
+
+To configure high availability for your internal MySQL databases, see [Configure Internal MySQL](#internal-mysql).
+
+### <a id='create-dbs'></a> External System Database Configuration
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/ert_database_external" %>
+
+## <a id='internal-mysql'></a> (Optional) Configure Internal MySQL
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/mysql_proxy_config" %>
+
+## <a id='file-storage'></a> Configure File Storage
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/max_droplets_packages_config" %>
+
+## <a id='sys-logging'></a> (Optional) Configure System Logging
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/system_logging" %>
+
+## <a id='customize-apps-man'></a> (Optional) Configure Custom Branding and Apps Manager
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/custombranding" %>
+
+## <a id='smtp'></a> (Optional) Configure Email Notifications
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/email-notifs" %>
+
+## <a id='config-autoscaler'></a> (Optional) Configure App Autoscaler
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/app-autoscaler" %>
+
+## <a id='config-cc'></a> Configure Cloud Controller
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/cloud-controller" %>
+
+## <a id='config-smoke-test'></a> Configure Smoke Tests
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/smoketests" %>
+
+## <a id='advanced'></a> (Optional) Configure Advanced Features
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/advanced-features" %>
+
+## <a id='metric-registrar'></a> (Optional) Configure Metric Registrar
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/metric-registrar" %>
+
+## <a id='errands'></a> Configure Errands
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/errands" %>
+
+## <a id='resources'></a> Configure Resources
+
+In the **Resource Config** pane, you must associate load balancers with the VMs in your deployment to enable traffic. For more information, see [Configure Load Balancing for <%= vars.app_runtime_abbr %>](configure-lb.html).
+
+### <a name='scale-down'></a> (Optional) Scale Down and Disable Resources
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/disable_resources" %>
+
+## <a id='stemcell'></a> Download Stemcell
+
+<%# Find this partial in GitHub at `pivotal-cf/docs-partials` %>
+<%= partial "/pcf/core/#{vars.current_major_version.sub('.', '-')}/download-stemcell" %>
+
+## <a id='complete'></a> Complete the <%= vars.app_runtime_abbr %> Installation
+
+To complete your installation of <%= vars.app_runtime_abbr %>:
+
+1. Click the **Installation Dashboard** link to return to the <%= vars.ops_manager %> Installation Dashboard.
+
+1. Click **Review Pending Changes**, then **Apply Changes**. The install process generally requires a minimum of 90 minutes to complete. The following image shows the Changes Applied window that displays when the installation process successfully completes.
+
+    ![At the top of the pop-up window is a teal checkmark and the words 'Changes Applied'. In the upper-right corner is a gray circle with a white X in the middle. Below 'Changes Applied' is the text 'Ops Manager Director was successfully installed.' Below this text is the italicized text 'We recommend that you export a backup of this installation from the actions menu.' Below this text are two buttons, a gray rectangular button labeled 'Close' and a blue rectangular button labeled 'Return to Installation Dashboard'.](images/cloudform/ops-manager-complete.png)
